@@ -22,6 +22,7 @@ interface GeneratedTab {
   position: number;
   tuning: string;
   tempo: number;
+  caged_shape?: string;
 }
 
 interface ApiOptions {
@@ -262,10 +263,12 @@ function TabDisplay({ tab, isLoading }: TabDisplayProps) {
       <div className="flex flex-wrap gap-3">
         {[
           { label: 'Root', value: tab.root },
-          { label: 'Scale', value: tab.scale.replace('_', ' ') },
+          { label: 'Scale', value: tab.scale.replace(/_/g, ' ') },
           { label: 'Pattern', value: tab.pattern },
           { label: 'Tempo', value: `${tab.tempo} BPM` },
           { label: 'Position', value: `Fret ${tab.position}` },
+          // Show CAGED shape if pentatonic
+          ...(tab.caged_shape ? [{ label: 'CAGED', value: `${tab.caged_shape} Shape` }] : []),
         ].map((item) => (
           <div
             key={item.label}
@@ -305,11 +308,23 @@ function ControlPanel({ options, onGenerate, isLoading }: ControlPanelProps) {
   const [tempo, setTempo] = useState(120);
   const [bars, setBars] = useState(4);
   const [tuning, setTuning] = useState('standard');
+  const [cagedShape, setCagedShape] = useState('E');
 
   const roots = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const cagedShapes = ['E', 'D', 'C', 'A', 'G'];
+
+  // Check if current scale supports CAGED shapes
+  const isPentatonic = scale.includes('pentatonic');
 
   const handleGenerate = () => {
-    onGenerate({ root, scale, style, pattern, tempo, bars, tuning });
+    const params: Record<string, string | number> = {
+      root, scale, style, pattern, tempo, bars, tuning,
+    };
+    // Only include caged_shape for pentatonic scales
+    if (isPentatonic) {
+      params.caged_shape = cagedShape;
+    }
+    onGenerate(params);
   };
 
   return (
@@ -381,6 +396,27 @@ function ControlPanel({ options, onGenerate, isLoading }: ControlPanelProps) {
             ))}
           </select>
         </div>
+
+        {/* CAGED Shape - Only shows for pentatonic scales */}
+        {isPentatonic && (
+          <div>
+            <label className="form-label">
+              CAGED Shape
+              <span className="ml-1 text-[--color-accent] text-xs">(Box)</span>
+            </label>
+            <select
+              className="select-control"
+              value={cagedShape}
+              onChange={(e) => setCagedShape(e.target.value)}
+            >
+              {cagedShapes.map((shape, idx) => (
+                <option key={shape} value={shape}>
+                  {shape} Shape (Box {idx + 1})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Tuning */}
         <div>
