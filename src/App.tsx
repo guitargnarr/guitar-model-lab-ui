@@ -807,7 +807,7 @@ function App() {
     fetchOptions();
   }, []);
 
-  const handleGenerate = async (params: Record<string, string | number>) => {
+  const handleGenerate = useCallback(async (params: Record<string, string | number>) => {
     setIsLoading(true);
     setError(null);
 
@@ -830,7 +830,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleDownload = () => {
     if (!generatedTab) return;
