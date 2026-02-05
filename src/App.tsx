@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, Environment } from '@react-three/drei';
-import { Play, Download, RefreshCw, Music, Zap, GitBranch } from 'lucide-react';
+import { Play, Square, Download, RefreshCw, Music, Zap, GitBranch, Volume2, Repeat } from 'lucide-react';
 import type { Mesh } from 'three';
+import { getGuitarSynthesizer, type PlaybackState } from './lib/GuitarSynthesizer';
 
 // ============================================================
 // API Configuration
@@ -221,14 +222,177 @@ function Fretboard({ tab }: FretboardProps) {
 }
 
 // ============================================================
+// Playback Controls Component
+// ============================================================
+interface PlaybackControlsProps {
+  tab: string;
+  tempo: number;
+  onTempoChange: (tempo: number) => void;
+}
+
+function PlaybackControls({ tab, tempo, onTempoChange }: PlaybackControlsProps) {
+  const [playbackState, setPlaybackState] = useState<PlaybackState>('stopped');
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [totalNotes, setTotalNotes] = useState(0);
+  const stopFlagRef = useRef(false);
+
+  const handlePlay = useCallback(async () => {
+    const synth = getGuitarSynthesizer();
+
+    // Initialize if needed
+    if (!synth.isReady()) {
+      setIsInitializing(true);
+      const success = await synth.initialize();
+      setIsInitializing(false);
+      if (!success) {
+        console.error('Failed to initialize synthesizer');
+        return;
+      }
+    }
+
+    // Start playback
+    stopFlagRef.current = false;
+    setPlaybackState('playing');
+    setProgress(0);
+
+    try {
+      await synth.playTab(
+        tab,
+        { tempo, loop: isLooping },
+        (position, total) => {
+          setProgress(position);
+          setTotalNotes(total);
+        },
+        () => stopFlagRef.current
+      );
+    } finally {
+      if (!stopFlagRef.current) {
+        setPlaybackState('stopped');
+        setProgress(0);
+      }
+    }
+  }, [tab, tempo, isLooping]);
+
+  const handleStop = useCallback(() => {
+    stopFlagRef.current = true;
+    const synth = getGuitarSynthesizer();
+    synth.stop();
+    setPlaybackState('stopped');
+    setProgress(0);
+  }, []);
+
+  const progressPercent = totalNotes > 0 ? (progress / totalNotes) * 100 : 0;
+
+  return (
+    <div className="playback-controls">
+      <div className="flex items-center gap-4">
+        {/* Play/Stop Button */}
+        <div className="flex gap-2">
+          {playbackState === 'playing' ? (
+            <button
+              className="btn-playback btn-stop"
+              onClick={handleStop}
+              title="Stop"
+            >
+              <Square className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              className="btn-playback btn-play"
+              onClick={handlePlay}
+              disabled={isInitializing}
+              title="Play"
+            >
+              {isInitializing ? (
+                <div className="spinner" style={{ width: 20, height: 20 }} />
+              ) : (
+                <Play className="w-5 h-5" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Loop Toggle */}
+        <button
+          className={`btn-playback-small ${isLooping ? 'active' : ''}`}
+          onClick={() => setIsLooping(!isLooping)}
+          title="Loop"
+        >
+          <Repeat className="w-4 h-4" />
+        </button>
+
+        {/* Volume/Status Indicator */}
+        <div className="flex items-center gap-2 text-[--color-text-muted]">
+          <Volume2 className="w-4 h-4" />
+          <span className="text-xs">
+            {playbackState === 'playing'
+              ? `${progress}/${totalNotes}`
+              : 'Ready'}
+          </span>
+        </div>
+
+        {/* Tempo Control */}
+        <div className="flex items-center gap-3 ml-auto">
+          <label className="text-xs text-[--color-text-muted] uppercase tracking-wider">
+            Tempo
+          </label>
+          <input
+            type="range"
+            min={40}
+            max={200}
+            value={tempo}
+            onChange={(e) => onTempoChange(parseInt(e.target.value, 10))}
+            className="w-24"
+          />
+          <span className="text-sm text-[--color-accent] font-mono w-16">
+            {tempo} BPM
+          </span>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      {playbackState === 'playing' && (
+        <div className="mt-3">
+          <div className="progress-bar">
+            <motion.div
+              className="progress-fill"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 0.1 }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // Tab Display Component
 // ============================================================
 interface TabDisplayProps {
   tab: GeneratedTab | null;
   isLoading: boolean;
+  onTempoChange?: (tempo: number) => void;
 }
 
-function TabDisplay({ tab, isLoading }: TabDisplayProps) {
+function TabDisplay({ tab, isLoading, onTempoChange }: TabDisplayProps) {
+  const [playbackTempo, setPlaybackTempo] = useState(120);
+
+  // Sync tempo from tab
+  useEffect(() => {
+    if (tab?.tempo) {
+      setPlaybackTempo(tab.tempo);
+    }
+  }, [tab?.tempo]);
+
+  const handleTempoChange = (newTempo: number) => {
+    setPlaybackTempo(newTempo);
+    onTempoChange?.(newTempo);
+  };
+
   if (isLoading) {
     return (
       <div className="tab-display flex items-center justify-center min-h-[200px]">
@@ -283,8 +447,19 @@ function TabDisplay({ tab, isLoading }: TabDisplayProps) {
       {/* Fretboard visualization */}
       <Fretboard tab={tab.tab} tuning={tab.tuning} />
 
-      {/* Tab notation */}
-      <div className="tab-display">
+      {/* Playback Controls */}
+      <PlaybackControls
+        tab={tab.tab}
+        tempo={playbackTempo}
+        onTempoChange={handleTempoChange}
+      />
+
+      {/* Tab notation with enhanced styling */}
+      <div className="tab-display-enhanced">
+        <div className="tab-header">
+          <span className="tab-title">ASCII Tablature</span>
+          <span className="tab-tuning">{tab.tuning} Tuning</span>
+        </div>
         <pre className="font-tab whitespace-pre">{tab.tab}</pre>
       </div>
     </motion.div>
@@ -315,8 +490,33 @@ function ControlPanel({ options, onGenerate, isLoading }: ControlPanelProps) {
 
   // Check if current scale supports CAGED shapes
   const isPentatonic = scale.includes('pentatonic');
+  const isBlues = scale === 'blues';
+
+  // Check for incompatible combinations
+  const is3npsIncompatible = (isPentatonic || isBlues) && pattern === '3nps';
+
+  // Auto-fix pattern if incompatible scale selected
+  useEffect(() => {
+    if ((isPentatonic || isBlues) && pattern === '3nps') {
+      setPattern('ascending');
+    }
+  }, [scale, pattern, isPentatonic, isBlues]);
+
+  // Get valid patterns for current scale
+  const getValidPatterns = () => {
+    if (isPentatonic || isBlues) {
+      // 3nps requires 7-note scales
+      return options.patterns.filter(p => p !== '3nps');
+    }
+    return options.patterns;
+  };
 
   const handleGenerate = () => {
+    // Don't generate if combination is invalid
+    if (is3npsIncompatible) {
+      return;
+    }
+
     const params: Record<string, string | number> = {
       root, scale, style, pattern, tempo, bars, tuning,
     };
@@ -383,13 +583,18 @@ function ControlPanel({ options, onGenerate, isLoading }: ControlPanelProps) {
 
         {/* Pattern */}
         <div>
-          <label className="form-label">Pattern</label>
+          <label className="form-label">
+            Pattern
+            {(isPentatonic || isBlues) && (
+              <span className="ml-1 text-[--color-text-muted] text-xs">(3nps requires 7-note scale)</span>
+            )}
+          </label>
           <select
             className="select-control"
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
           >
-            {options.patterns.map((p) => (
+            {getValidPatterns().map((p) => (
               <option key={p} value={p}>
                 {p.replace(/_/g, ' ')}
               </option>
