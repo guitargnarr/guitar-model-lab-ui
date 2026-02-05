@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshTransmissionMaterial, Environment } from '@react-three/drei';
+import { Float, Environment } from '@react-three/drei';
 import { Play, Download, RefreshCw, Music, Zap, GitBranch } from 'lucide-react';
 import type { Mesh } from 'three';
 
@@ -47,19 +47,19 @@ function GuitarPick() {
   return (
     <Float speed={1.5} rotationIntensity={0.3} floatIntensity={0.5}>
       <mesh ref={meshRef} scale={2}>
-        {/* Rounded triangle approximation for guitar pick */}
-        <torusKnotGeometry args={[1, 0.4, 128, 32, 2, 3]} />
-        <MeshTransmissionMaterial
-          backside
-          samples={6}
-          thickness={0.5}
-          chromaticAberration={0.3}
-          distortion={0.2}
-          distortionScale={0.5}
-          temporalDistortion={0.1}
-          ior={1.5}
+        {/* Optimized geometry: reduced segments for performance */}
+        <torusKnotGeometry args={[1, 0.4, 64, 16, 2, 3]} />
+        {/* MeshPhysicalMaterial: premium look without transmission overhead */}
+        <meshPhysicalMaterial
           color="#c8956c"
-          roughness={0.1}
+          metalness={0.1}
+          roughness={0.2}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
+          reflectivity={0.8}
+          envMapIntensity={1.5}
+          transparent
+          opacity={0.85}
         />
       </mesh>
     </Float>
