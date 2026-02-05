@@ -511,6 +511,40 @@ function ControlPanel({ options, onGenerate, isLoading }: ControlPanelProps) {
     return options.patterns;
   };
 
+  // Debounced auto-generation when any control changes
+  // Prevents race conditions from rapid dropdown changes
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Skip if invalid combination or no patterns loaded yet
+    if (is3npsIncompatible || options.patterns.length === 0) {
+      return;
+    }
+
+    // Clear any pending generation
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Debounce: wait 300ms after last change before generating
+    debounceRef.current = setTimeout(() => {
+      const params: Record<string, string | number> = {
+        root, scale, style, pattern, tempo, bars, tuning,
+      };
+      if (isPentatonic) {
+        params.caged_shape = cagedShape;
+      }
+      onGenerate(params);
+    }, 300);
+
+    // Cleanup on unmount or before next effect
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [root, scale, style, pattern, tempo, bars, tuning, cagedShape, isPentatonic, is3npsIncompatible, options.patterns.length, onGenerate]);
+
   const handleGenerate = () => {
     // Don't generate if combination is invalid
     if (is3npsIncompatible) {
