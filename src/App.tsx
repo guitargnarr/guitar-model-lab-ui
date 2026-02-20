@@ -902,6 +902,7 @@ ${generatedTab.tab}
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate. Please try again.');
+      setIsInstrumentLoading(false);
       console.error(err);
     }
   }, []);
