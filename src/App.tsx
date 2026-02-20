@@ -2,9 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, MeshTransmissionMaterial, Environment } from '@react-three/drei';
-import { Play, Square, Download, RefreshCw, Music, Zap, GitBranch, Volume2, Repeat } from 'lucide-react';
+import { Play, Square, Download, RefreshCw, Music, Zap, GitBranch, Volume2, Repeat, Guitar } from 'lucide-react';
 import type { Mesh } from 'three';
 import { getGuitarSynthesizer, type PlaybackState } from './lib/GuitarSynthesizer';
+import InstrumentControlPanel from './components/instrument/InstrumentControlPanel';
+import InstrumentDisplay from './components/instrument/InstrumentDisplay';
+import type { AppMode, InstrumentDefinition, GeneratedInstrumentResult, InstrumentGenerateParams } from './lib/types';
 
 // ============================================================
 // API Configuration
@@ -764,6 +767,7 @@ function Header() {
 // Main App Component
 // ============================================================
 function App() {
+  const [mode, setMode] = useState<AppMode>('guitar');
   const [options, setOptions] = useState<ApiOptions>({
     scales: [],
     tunings: [],
@@ -774,22 +778,30 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Instrument mode state
+  const [instruments, setInstruments] = useState<Record<string, InstrumentDefinition>>({});
+  const [generatedInstrument, setGeneratedInstrument] = useState<GeneratedInstrumentResult | null>(null);
+  const [isInstrumentLoading, setIsInstrumentLoading] = useState(false);
+  const [instrumentParams, setInstrumentParams] = useState<InstrumentGenerateParams | null>(null);
+
   // Fetch API options on mount
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [scalesRes, tuningsRes, stylesRes, patternsRes] = await Promise.all([
+        const [scalesRes, tuningsRes, stylesRes, patternsRes, instrumentsRes] = await Promise.all([
           fetch(`${API_URL}/scales`),
           fetch(`${API_URL}/tunings`),
           fetch(`${API_URL}/styles`),
           fetch(`${API_URL}/patterns`),
+          fetch(`${API_URL}/instruments`),
         ]);
 
-        const [scales, tunings, styles, patterns] = await Promise.all([
+        const [scales, tunings, styles, patterns, instrumentsData] = await Promise.all([
           scalesRes.json(),
           tuningsRes.json(),
           stylesRes.json(),
           patternsRes.json(),
+          instrumentsRes.json(),
         ]);
 
         setOptions({
@@ -798,6 +810,8 @@ function App() {
           styles: styles.styles || [],
           patterns: patterns.patterns || [],
         });
+
+        setInstruments(instrumentsData.instruments || {});
       } catch (err) {
         setError('Failed to load options from API');
         console.error(err);
@@ -856,6 +870,41 @@ ${generatedTab.tab}
     URL.revokeObjectURL(url);
   };
 
+  const handleInstrumentGenerate = useCallback(async (params: InstrumentGenerateParams) => {
+    setIsInstrumentLoading(true);
+    setError(null);
+    setInstrumentParams(params);
+
+    try {
+      const response = await fetch(`${API_URL}/generate-instrument`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.detail || 'Failed to generate instrument part');
+      }
+
+      const data = await response.json();
+      setGeneratedInstrument({
+        ...data,
+        instrument: params.instrument,
+        root: params.root,
+        scale: params.scale,
+        pattern: params.pattern,
+        bars: params.bars,
+        tempo: params.tempo,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate. Please try again.');
+      console.error(err);
+    } finally {
+      setIsInstrumentLoading(false);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-[--color-void]">
       {/* Noise overlay */}
@@ -869,19 +918,45 @@ ${generatedTab.tab}
         <Scene3D />
         <div className="relative z-10 text-center px-6">
           <p className="eyebrow animate-fade-up animate-delay-1 mb-4">
-            Algorithmic Riff Generation
+            {mode === 'guitar' ? 'Algorithmic Riff Generation' : 'Multi-Instrument Generation'}
           </p>
           <h1 className="font-display text-5xl md:text-7xl text-[--color-text-primary] animate-fade-up animate-delay-2 mb-4">
-            Guitar <span className="font-display-italic text-[--color-accent]">Model</span> Lab
+            {mode === 'guitar' ? (
+              <>Guitar <span className="font-display-italic text-[--color-accent]">Model</span> Lab</>
+            ) : (
+              <>Music <span className="font-display-italic text-[--color-accent]">Model</span> Lab</>
+            )}
           </h1>
           <p className="text-[--color-text-secondary] max-w-xl mx-auto animate-fade-up animate-delay-3">
-            Generate guitar riffs using music theory algorithms. Select your scale, style, and pattern — the AI handles the rest.
+            {mode === 'guitar'
+              ? 'Generate guitar riffs using music theory algorithms. Select your scale, style, and pattern.'
+              : 'Generate piano, strings, and synth parts. Choose your instrument and let the theory engine compose.'}
           </p>
         </div>
       </section>
 
       {/* Accent line */}
       <div className="accent-line" />
+
+      {/* Mode Toggle */}
+      <div className="max-w-7xl mx-auto px-6 pt-8">
+        <div className="mode-toggle">
+          <button
+            className={`mode-toggle-btn ${mode === 'guitar' ? 'active' : ''}`}
+            onClick={() => setMode('guitar')}
+          >
+            <Guitar className="w-4 h-4" />
+            Guitar
+          </button>
+          <button
+            className={`mode-toggle-btn ${mode === 'instrument' ? 'active' : ''}`}
+            onClick={() => setMode('instrument')}
+          >
+            <Music className="w-4 h-4" />
+            Instruments
+          </button>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-16">
@@ -895,67 +970,96 @@ ${generatedTab.tab}
           </motion.div>
         )}
 
-        <div className="grid lg:grid-cols-[380px_1fr] gap-8">
-          {/* Control Panel */}
-          <div className="animate-fade-up animate-delay-4">
-            <ControlPanel
-              options={options}
-              onGenerate={handleGenerate}
-              isLoading={isLoading}
-            />
-          </div>
-
-          {/* Output Area */}
-          <div className="animate-fade-up animate-delay-5">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-2xl text-[--color-text-primary]">
-                Generated <span className="font-display-italic text-[--color-accent]">Output</span>
-              </h2>
-              <AnimatePresence>
-                {generatedTab && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="flex gap-2"
-                  >
-                    <button
-                      className="btn-secondary flex items-center gap-2"
-                      onClick={() => handleGenerate({
-                        root: generatedTab.root,
-                        scale: generatedTab.scale,
-                        pattern: generatedTab.pattern,
-                        tempo: generatedTab.tempo,
-                        bars: generatedTab.bars,
-                        tuning: generatedTab.tuning,
-                        style: 'metal',
-                      })}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Regenerate
-                    </button>
-                    <button
-                      className="btn-secondary flex items-center gap-2"
-                      onClick={handleDownload}
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+        {mode === 'guitar' ? (
+          <div className="grid lg:grid-cols-[380px_1fr] gap-8">
+            {/* Control Panel */}
+            <div className="animate-fade-up animate-delay-4">
+              <ControlPanel
+                options={options}
+                onGenerate={handleGenerate}
+                isLoading={isLoading}
+              />
             </div>
 
-            <TabDisplay tab={generatedTab} isLoading={isLoading} />
+            {/* Output Area */}
+            <div className="animate-fade-up animate-delay-5">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-2xl text-[--color-text-primary]">
+                  Generated <span className="font-display-italic text-[--color-accent]">Output</span>
+                </h2>
+                <AnimatePresence>
+                  {generatedTab && (
+                    <motion.div
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="flex gap-2"
+                    >
+                      <button
+                        className="btn-secondary flex items-center gap-2"
+                        onClick={() => handleGenerate({
+                          root: generatedTab.root,
+                          scale: generatedTab.scale,
+                          pattern: generatedTab.pattern,
+                          tempo: generatedTab.tempo,
+                          bars: generatedTab.bars,
+                          tuning: generatedTab.tuning,
+                          style: 'metal',
+                        })}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Regenerate
+                      </button>
+                      <button
+                        className="btn-secondary flex items-center gap-2"
+                        onClick={handleDownload}
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <TabDisplay tab={generatedTab} isLoading={isLoading} />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid lg:grid-cols-[380px_1fr] gap-8">
+            {/* Instrument Control Panel */}
+            <div>
+              <InstrumentControlPanel
+                instruments={instruments}
+                scales={options.scales}
+                onGenerate={handleInstrumentGenerate}
+                isLoading={isInstrumentLoading}
+              />
+            </div>
+
+            {/* Instrument Output */}
+            <div>
+              <div className="flex items-center mb-6">
+                <h2 className="font-display text-2xl text-[--color-text-primary]">
+                  Generated <span className="font-display-italic text-[--color-accent]">Output</span>
+                </h2>
+              </div>
+
+              <InstrumentDisplay
+                result={generatedInstrument}
+                isLoading={isInstrumentLoading}
+                currentParams={instrumentParams}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
       <footer className="border-t border-[--color-border] py-8">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-[--color-text-muted]">
-            © 2026 Guitar Model Lab. Built with music theory + algorithms.
+            © 2026 Music Model Lab. Built with music theory + algorithms.
           </p>
           <p className="text-sm text-[--color-text-muted]">
             API: <span className="text-[--color-accent]">guitar-model-lab.onrender.com</span>

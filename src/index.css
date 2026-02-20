@@ -558,3 +558,175 @@ input[type="number"]:focus {
     line-height: 1.6;
   }
 }
+
+/* ============================================================
+   INSTRUMENT MODE
+   ============================================================ */
+
+/* Mode Toggle */
+.mode-toggle {
+  display: inline-flex;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.mode-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mode-toggle-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+.mode-toggle-btn.active {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-deep) 100%);
+  color: var(--color-void);
+  box-shadow: 0 2px 10px var(--color-accent-glow);
+}
+
+/* Instrument Picker Grid */
+.instrument-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+@media (min-width: 480px) {
+  .instrument-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.instrument-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-body);
+}
+
+.instrument-card:hover {
+  border-color: var(--color-border-hover);
+  color: var(--color-text-secondary);
+}
+
+.instrument-card.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(200, 149, 108, 0.08);
+  box-shadow: 0 0 16px var(--color-accent-glow);
+}
+
+/* Piano Roll */
+.piano-roll-container {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+}
+
+.piano-roll-labels {
+  position: relative;
+  width: 44px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.piano-roll-label {
+  position: absolute;
+  right: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-text-muted);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.piano-roll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+
+.piano-roll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.piano-roll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.piano-roll::-webkit-scrollbar-thumb {
+  background: var(--color-accent-deep);
+  border-radius: 3px;
+}
+
+.piano-roll-inner {
+  position: relative;
+  min-width: 100%;
+}
+
+.piano-roll-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.piano-roll-grid-line.octave {
+  background: rgba(200, 149, 108, 0.12);
+}
+
+.piano-roll-beat-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.piano-roll-beat-line.bar {
+  background: rgba(200, 149, 108, 0.15);
+}
+
+.piano-roll-note {
+  position: absolute;
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%);
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--color-accent-glow);
+  transition: opacity 0.15s ease;
+}
+
+.piano-roll-note:hover {
+  box-shadow: 0 0 12px rgba(200, 149, 108, 0.4);
+}
