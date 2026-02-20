@@ -11,7 +11,6 @@ const BEAT_WIDTH = 48;
 
 export default function PianoRoll({ events }: PianoRollProps) {
   const { pitchRange, totalBeats, noteBlocks } = useMemo(() => {
-    // Collect all MIDI notes and calculate time positions
     let minPitch = 127;
     let maxPitch = 0;
     let beatPos = 0;
@@ -23,7 +22,7 @@ export default function PianoRoll({ events }: PianoRollProps) {
     }> = [];
 
     for (const event of events) {
-      const beatDuration = 4 / event.duration; // quarter=1, eighth=0.5, whole=4
+      const beatDuration = 4 / event.duration;
       for (const midi of event.midi_notes) {
         minPitch = Math.min(minPitch, midi);
         maxPitch = Math.max(maxPitch, midi);
@@ -37,7 +36,6 @@ export default function PianoRoll({ events }: PianoRollProps) {
       beatPos += beatDuration;
     }
 
-    // Pad range by 2 semitones
     minPitch = Math.max(0, minPitch - 2);
     maxPitch = Math.min(127, maxPitch + 2);
 
@@ -52,12 +50,11 @@ export default function PianoRoll({ events }: PianoRollProps) {
   const containerHeight = pitchSpan * ROW_HEIGHT;
   const containerWidth = Math.max(totalBeats * BEAT_WIDTH, 300);
 
-  // Generate pitch labels (only show naturals + octave boundaries)
+  // Only compute pitch labels for the sidebar
   const pitchLabels = useMemo(() => {
     const labels: Array<{ midi: number; label: string; y: number }> = [];
     for (let midi = pitchRange.max; midi >= pitchRange.min; midi--) {
       const name = midiToNoteName(midi);
-      // Show C notes (octave boundaries) and every 3rd semitone
       if (name.startsWith('C') || (midi - pitchRange.min) % 3 === 0) {
         labels.push({
           midi,
@@ -69,20 +66,26 @@ export default function PianoRoll({ events }: PianoRollProps) {
     return labels;
   }, [pitchRange]);
 
-  // Generate beat grid lines
-  const beatLines = useMemo(() => {
-    const lines: number[] = [];
-    for (let b = 0; b <= totalBeats; b++) {
-      lines.push(b);
-    }
-    return lines;
-  }, [totalBeats]);
-
   if (events.length === 0) return null;
+
+  // Use CSS background-image for grid lines instead of DOM nodes
+  const gridBg = `repeating-linear-gradient(
+    0deg,
+    rgba(255,255,255,0.03) 0px,
+    rgba(255,255,255,0.03) 1px,
+    transparent 1px,
+    transparent ${ROW_HEIGHT}px
+  ), repeating-linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0px,
+    rgba(255,255,255,0.04) 1px,
+    transparent 1px,
+    transparent ${BEAT_WIDTH}px
+  )`;
 
   return (
     <div className="piano-roll-container">
-      <div className="piano-roll-labels">
+      <div className="piano-roll-labels" style={{ height: containerHeight }}>
         {pitchLabels.map(({ midi, label, y }) => (
           <div
             key={midi}
@@ -93,31 +96,16 @@ export default function PianoRoll({ events }: PianoRollProps) {
           </div>
         ))}
       </div>
-      <div className="piano-roll" style={{ height: containerHeight }}>
-        <div className="piano-roll-inner" style={{ width: containerWidth, height: containerHeight }}>
-          {/* Horizontal pitch grid lines */}
-          {Array.from({ length: pitchSpan }, (_, i) => {
-            const midi = pitchRange.max - i;
-            const isC = midiToNoteName(midi).startsWith('C');
-            return (
-              <div
-                key={`grid-${midi}`}
-                className={`piano-roll-grid-line ${isC ? 'octave' : ''}`}
-                style={{ top: i * ROW_HEIGHT }}
-              />
-            );
-          })}
-
-          {/* Vertical beat lines */}
-          {beatLines.map((b) => (
-            <div
-              key={`beat-${b}`}
-              className={`piano-roll-beat-line ${b % 4 === 0 ? 'bar' : ''}`}
-              style={{ left: b * BEAT_WIDTH }}
-            />
-          ))}
-
-          {/* Note blocks */}
+      <div className="piano-roll" style={{ height: Math.min(containerHeight, 300) }}>
+        <div
+          className="piano-roll-inner"
+          style={{
+            width: containerWidth,
+            height: containerHeight,
+            backgroundImage: gridBg,
+          }}
+        >
+          {/* Note blocks only -- grid is CSS background */}
           {noteBlocks.map((block, i) => (
             <div
               key={i}

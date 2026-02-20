@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, MeshTransmissionMaterial, Environment } from '@react-three/drei';
@@ -888,20 +888,21 @@ ${generatedTab.tab}
       }
 
       const data = await response.json();
-      setGeneratedInstrument({
-        ...data,
-        instrument: params.instrument,
-        root: params.root,
-        scale: params.scale,
-        pattern: params.pattern,
-        bars: params.bars,
-        tempo: params.tempo,
+      startTransition(() => {
+        setGeneratedInstrument({
+          ...data,
+          instrument: params.instrument,
+          root: params.root,
+          scale: params.scale,
+          pattern: params.pattern,
+          bars: params.bars,
+          tempo: params.tempo,
+        });
+        setIsInstrumentLoading(false);
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate. Please try again.');
       console.error(err);
-    } finally {
-      setIsInstrumentLoading(false);
     }
   }, []);
 
@@ -943,14 +944,14 @@ ${generatedTab.tab}
         <div className="mode-toggle">
           <button
             className={`mode-toggle-btn ${mode === 'guitar' ? 'active' : ''}`}
-            onClick={() => setMode('guitar')}
+            onClick={() => startTransition(() => setMode('guitar'))}
           >
             <Guitar className="w-4 h-4" />
             Guitar
           </button>
           <button
             className={`mode-toggle-btn ${mode === 'instrument' ? 'active' : ''}`}
-            onClick={() => setMode('instrument')}
+            onClick={() => startTransition(() => setMode('instrument'))}
           >
             <Music className="w-4 h-4" />
             Instruments
